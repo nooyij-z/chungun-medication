@@ -46,6 +46,23 @@
   --blue: #3B82F6;
   --purple: #8B5CF6;
 }
+body.light-mode {
+  --navy: #F0F4FF;
+  --navy2: #E8EEFF;
+  --navy3: #D8E4FF;
+  --navy4: #C8D8FF;
+  --gray: #4B5563;
+  --gray2: #6B7280;
+  --white: #1E3A6E;
+  --light: #1E3A6E;
+  --mint-glow: rgba(21,101,192,0.08);
+}
+body.light-mode input, body.light-mode select, body.light-mode textarea {
+  background: rgba(0,0,0,0.05);
+  border-color: rgba(0,0,0,0.15);
+  color: #1E3A6E;
+}
+body.light-mode input::placeholder, body.light-mode textarea::placeholder { color: #9CA3AF; }
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family:'Noto Sans KR',sans-serif; background:var(--navy); color:var(--white); min-height:100vh; }
 
@@ -363,6 +380,26 @@ select option { background:var(--navy2); }
   .quick-actions { grid-template-columns:1fr 1fr; }
   .add-record-row { grid-template-columns:1fr; }
 }
+
+/* 채팅 */
+.chat-room-list { display:flex; flex-direction:column; gap:10px; margin-bottom:20px; }
+.chat-room-item { background:var(--navy2); border:1.5px solid rgba(255,255,255,0.12); border-radius:14px; padding:16px 20px; cursor:pointer; transition:all 0.2s; display:flex; align-items:center; justify-content:space-between; }
+.chat-room-item:hover { border-color:var(--mint); }
+.chat-messages { display:flex; flex-direction:column; gap:10px; padding:16px 0; min-height:300px; max-height:400px; overflow-y:auto; }
+.chat-msg { display:flex; gap:10px; }
+.chat-msg.mine { flex-direction:row-reverse; }
+.chat-bubble { max-width:70%; padding:10px 14px; border-radius:16px; font-size:13px; line-height:1.6; }
+.chat-msg.mine .chat-bubble { background:var(--mint); color:#fff; border-bottom-right-radius:4px; }
+.chat-msg:not(.mine) .chat-bubble { background:var(--navy3); color:var(--white); border-bottom-left-radius:4px; }
+.chat-input-row { display:flex; gap:10px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.08); margin-top:8px; }
+.chat-input-row input { flex:1; }
+/* 알림 뱃지 */
+.notif-badge { background:var(--danger); color:#fff; border-radius:50%; width:18px; height:18px; font-size:10px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; margin-left:4px; }
+/* 상태기록 */
+.health-log-card { background:var(--navy2); border:1.5px solid rgba(255,255,255,0.12); border-radius:14px; padding:16px 20px; margin-bottom:10px; }
+/* 테마 토글 */
+.theme-toggle { background:rgba(255,255,255,0.08); border:none; color:var(--white); cursor:pointer; font-size:18px; padding:6px 10px; border-radius:8px; transition:all 0.2s; }
+.theme-toggle:hover { background:rgba(255,255,255,0.15); }
 </style>
 </head>
 <body>
@@ -466,6 +503,7 @@ select option { background:var(--navy2); }
         </div>
       </div>
       <button class="logout-btn" onclick="doLogout()">로그아웃</button>
+      <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">🌙</button>
     </div>
   </header>
 
@@ -475,6 +513,9 @@ select option { background:var(--navy2); }
     <div class="nav-item" data-page="myDrugs" onclick="goPage('myDrugs')"><span class="nav-icon">💊</span> 내 약 관리</div>
     <div class="nav-item" data-page="borrow" onclick="goPage('borrow')"><span class="nav-icon">🤝</span> 친구 약 빌리기</div>
     <div class="nav-item" data-page="record" onclick="goPage('record')"><span class="nav-icon">📋</span> 복약 기록</div>
+    <div class="nav-item" data-page="healthlog" onclick="goPage('healthlog')"><span class="nav-icon">📊</span> 상태 기록</div>
+    <div class="nav-item" data-page="dormitory" onclick="goPage('dormitory')"><span class="nav-icon">🏥</span> 사감실</div>
+    <div class="nav-item" data-page="chat" onclick="goPage('chat')"><span class="nav-icon">💬</span> 채팅<span class="notif-badge hidden" id="chatBadge">0</span></div>
     <div class="nav-item" data-page="ocr" onclick="goPage('ocr')"><span class="nav-icon">📷</span> 약 사진 검색</div>
     <div class="nav-item" data-page="health" onclick="goPage('health')"><span class="nav-icon">💡</span> 건강 정보</div>
     <div class="nav-item" data-page="contact" onclick="goPage('contact')"><span class="nav-icon">✉️</span> 개발자 문의</div>
@@ -550,9 +591,13 @@ select option { background:var(--navy2); }
           <h3>🤖 AI 복약 가이드 <span class="tag tag-mint" style="font-size:11px">Claude</span></h3>
           <div class="ai-result-content" id="aiResultContent"></div>
         </div>
+        <div id="dangerDrugsBox" class="hidden" style="margin-top:16px;padding:16px 20px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:16px">
+          <div style="font-size:13px;font-weight:700;color:var(--danger);margin-bottom:10px">⚠️ 같이 먹으면 안 되는 약 조합</div>
+          <div id="dangerDrugsContent" style="font-size:13px;color:#CBD5E1;line-height:1.8;white-space:pre-wrap"></div>
+        </div>
         <div style="margin-top:20px">
           <div class="section-title">친구들이 가진 관련 약</div>
-          <div id="matchedFriendDrugs" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px"></div>
+          <div id="matchedFriendDrugs" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px"><div style="color:var(--gray);font-size:13px;padding:10px 0">AI 분석 후 표시돼요</div></div>
         </div>
       </div>
     </div>
@@ -645,6 +690,130 @@ select option { background:var(--navy2); }
         <div style="font-size:13px;color:var(--gray)">기숙사 학생을 위한 맞춤 건강 팁</div>
       </div>
       <div class="health-tips" id="healthTips"></div>
+    </div>
+
+    <!-- 사감실 비상약 현황 -->
+    <div id="page-dormitory" class="hidden">
+      <div style="margin-bottom:24px">
+        <div style="font-size:20px;font-weight:800;margin-bottom:6px">🏥 사감실 비상약 현황</div>
+        <div style="font-size:13px;color:var(--gray)">현재 사감실에 있는 비상약 목록이에요</div>
+      </div>
+      <div id="dormAdminPanel" class="hidden">
+        <div class="card" style="margin-bottom:20px;border-color:rgba(245,158,11,0.3);background:rgba(245,158,11,0.05)">
+          <div class="section-title">⚙️ 관리자 모드</div>
+          <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+            <input type="text" id="dormDrugName" placeholder="약 이름" style="flex:1;min-width:120px">
+            <input type="number" id="dormDrugQty" placeholder="수량" style="width:80px">
+            <select id="dormStatus" style="width:100px">
+              <option value="운영중">운영중</option>
+              <option value="품절">품절</option>
+              <option value="소진임박">소진임박</option>
+            </select>
+            <button class="btn btn-mint" onclick="addDormDrug()" style="padding:10px 16px">추가</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;background:rgba(255,255,255,0.03);border-radius:10px">
+            <span style="font-size:13px;color:var(--gray)">사감실 운영 상태:</span>
+            <label class="share-toggle"><input type="checkbox" id="dormOpenToggle" onchange="setDormOpen(this.checked)"><span class="share-slider"></span></label>
+            <span id="dormOpenLabel" style="font-size:13px;font-weight:600;color:var(--safe)">운영중</span>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+          <div id="dormStatusBadge" style="padding:6px 16px;border-radius:20px;font-size:13px;font-weight:700;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);color:var(--safe)">🟢 운영중</div>
+          <div style="font-size:12px;color:var(--gray)">마지막 업데이트: <span id="dormLastUpdate">-</span></div>
+          <button class="btn btn-outline" style="padding:6px 12px;font-size:12px;margin-left:auto" onclick="toggleDormAdmin()">관리자</button>
+        </div>
+        <div id="dormDrugList"><div style="text-align:center;padding:30px;color:var(--gray)">비상약 정보를 불러오는 중...</div></div>
+      </div>
+    </div>
+
+    <!-- 나의 상태 기록 -->
+    <div id="page-healthlog" class="hidden">
+      <div style="margin-bottom:24px">
+        <div style="font-size:20px;font-weight:800;margin-bottom:6px">📊 나의 상태 기록</div>
+        <div style="font-size:13px;color:var(--gray)">"저번 생리통 때는 얼마나 아팠지?" 과거 내 상태를 기록하고 돌아봐요</div>
+      </div>
+      <div class="card" style="margin-bottom:20px">
+        <div class="section-title">새 상태 기록</div>
+        <div class="form-group">
+          <label class="form-label">증상/상태 *</label>
+          <input type="text" id="logSymptom" placeholder="예: 감기, 생리통, 두통, 컨디션 좋음">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+          <div class="form-group">
+            <label class="form-label">심각도 (1~5)</label>
+            <select id="logSeverity">
+              <option value="1">1 - 거의 안 아픔</option>
+              <option value="2">2 - 약간 불편</option>
+              <option value="3" selected>3 - 보통</option>
+              <option value="4">4 - 꽤 아픔</option>
+              <option value="5">5 - 매우 심함</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">카테고리</label>
+            <select id="logCategory">
+              <option value="감기">감기</option>
+              <option value="생리통">생리통</option>
+              <option value="두통">두통</option>
+              <option value="복통">복통</option>
+              <option value="발열">발열</option>
+              <option value="컨디션">컨디션</option>
+              <option value="기타">기타</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:12px">
+          <label class="form-label">메모</label>
+          <textarea id="logMemo" rows="2" placeholder="오늘 몸 상태에 대해 자세히 적어보세요..."></textarea>
+        </div>
+        <button class="btn btn-mint" style="width:100%;padding:13px;margin-top:14px" onclick="saveHealthLog()">📊 상태 기록하기</button>
+      </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <div class="section-title" style="margin-bottom:0">기록 히스토리</div>
+          <select id="logFilterCat" onchange="loadHealthLogs()" style="width:120px;padding:6px 10px;font-size:12px">
+            <option value="전체">전체</option>
+            <option value="감기">감기</option>
+            <option value="생리통">생리통</option>
+            <option value="두통">두통</option>
+            <option value="복통">복통</option>
+            <option value="발열">발열</option>
+            <option value="컨디션">컨디션</option>
+          </select>
+        </div>
+        <div id="healthLogList"><div style="text-align:center;padding:30px;color:var(--gray)">기록이 없어요</div></div>
+      </div>
+    </div>
+
+    <!-- 채팅 -->
+    <div id="page-chat" class="hidden">
+      <div style="margin-bottom:24px">
+        <div style="font-size:20px;font-weight:800;margin-bottom:6px">💬 채팅</div>
+        <div style="font-size:13px;color:var(--gray)">친구에게 약 빌리기 전에 먼저 채팅으로 물어봐요!</div>
+      </div>
+      <div id="chatRoomView">
+        <div style="display:flex;gap:10px;margin-bottom:16px">
+          <input type="text" id="chatSearchInput" placeholder="이름으로 채팅 상대 찾기..." oninput="searchChatUsers(this.value)" style="flex:1">
+        </div>
+        <div id="chatUserResults" style="margin-bottom:16px"></div>
+        <div class="section-title">최근 대화</div>
+        <div id="chatRoomList" class="chat-room-list"></div>
+      </div>
+      <div id="chatMessageView" class="hidden">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+          <button class="btn btn-outline" style="padding:8px 14px" onclick="closeChatRoom()">← 뒤로</button>
+          <div style="font-size:16px;font-weight:700" id="chatRoomTitle">-</div>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="chat-messages" id="chatMessages"></div>
+          <div class="chat-input-row" style="padding:12px 16px">
+            <input type="text" id="chatInput" placeholder="메시지 입력..." onkeydown="if(event.key==='Enter')sendChatMsg()">
+            <button class="btn btn-mint" style="padding:10px 18px" onclick="sendChatMsg()">전송</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div id="page-contact" class="hidden">
@@ -835,6 +1004,10 @@ function showMainApp() {
   document.getElementById('headerRoom').textContent=`${currentUser.floor} ${currentUser.room}`;
   document.getElementById('dashName').textContent=currentUser.name;
   buildSymptomGrid();buildHealthTips();goPage('dashboard');
+  applyTheme();
+  // 주기적 알림 체크
+  setInterval(checkNotifs, 15000);
+  checkNotifs();
 }
 
 function goPage(page) {
@@ -847,6 +1020,9 @@ function goPage(page) {
   if(page==='borrow')loadFriendDrugs();
   if(page==='record')loadRecords();
   if(page==='contact')loadContactList();
+  if(page==='dormitory')loadDormitory();
+  if(page==='healthlog')loadHealthLogs();
+  if(page==='chat')loadChatRooms();
 }
 
 async function loadDashboard() {
@@ -934,15 +1110,46 @@ async function runAICheck(){
   content.innerHTML = `<div class="ai-typing"><div class="ai-dot"></div><div class="ai-dot"></div><div class="ai-dot"></div></div><div style="margin-top:12px;padding:12px 16px;background:rgba(255,255,255,0.05);border-radius:10px;font-size:13px;color:#90CAF9;line-height:1.7">${TMI_LIST[0]}</div>`;
 
   box.scrollIntoView({behavior:'smooth',block:'start'});
-  const prompt=`당신은 기숙사 학생들을 위한 친절하고 전문적인 복약 안내 AI입니다.\n\n학생 정보:\n- 증상: ${selectedSymptoms.join(', ')}\n- 오늘 이미 복용한 약: ${alreadyMeds.length>0?alreadyMeds.join(', '):'없음'}\n\n다음 형식으로 답변해주세요:\n\n1. 📋 증상 분석\n2. 💊 추천 약물 (2~3가지, 주성분·복용법 포함)\n3. ⚠️ 복용 주의사항 (학생 친화적 표현)\n4. 🌿 약 없이 해볼 수 있는 것\n5. 🚨 이럴 땐 사감실 가세요\n\n한국어로, 이모지 활용해 읽기 쉽게 작성해주세요.`;
+  const prompt=`당신은 기숙사 학생들을 위한 친절하고 전문적인 복약 안내 AI입니다.
+
+학생 정보:
+- 증상: ${selectedSymptoms.join(', ')}
+- 오늘 이미 복용한 약: ${alreadyMeds.length>0?alreadyMeds.join(', '):'없음'}
+
+반드시 다음 형식으로 답변해주세요 (각 섹션 제목 그대로 포함):
+
+1. 📋 증상 분석
+(증상에 대한 간단한 설명)
+
+2. 💊 추천 약물
+(2~3가지, 주성분·복용법 포함)
+
+3. ⚠️ 복용 주의사항
+(학생 친화적 표현으로)
+
+4. 🚫 같이 먹으면 안 되는 약 조합
+(이미 복용한 약과 추천 약물 간의 위험한 조합을 구체적으로 설명. 없으면 "특별한 금기 조합 없음"이라고 작성)
+
+5. 🌿 약 없이 해볼 수 있는 것
+
+6. 🚨 이럴 땐 사감실 가세요
+
+한국어로, 이모지 활용해 읽기 쉽게 작성해주세요.`;
   try {
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1200,messages:[{role:'user',content:prompt}]})
     });
     clearInterval(tmiInterval);
     const data=await res.json();
-    content.textContent=data.content.map(c=>c.text||'').join('');
+    const fullText=data.content.map(c=>c.text||'').join('');
+    // 같이 먹으면 안 되는 약 섹션 분리
+    const dangerMatch=fullText.match(/4\.\s*🚫[^\n]*\n([\s\S]*?)(?=5\.|$)/);
+    if(dangerMatch&&dangerMatch[1].trim()&&!dangerMatch[1].includes('특별한 금기 조합 없음')){
+      document.getElementById('dangerDrugsBox').classList.remove('hidden');
+      document.getElementById('dangerDrugsContent').textContent=dangerMatch[1].trim();
+    }
+    content.textContent=fullText;
     loadMatchedFriendDrugs();
   } catch(e) {
     clearInterval(tmiInterval);
@@ -959,15 +1166,18 @@ async function loadMatchedFriendDrugs(){
     const drugs=await storageGet(key,true)||[];
     const users=await storageGet('users',true)||{};
     const u=users[uid];if(!u)continue;
-    drugs.filter(d=>d.share).forEach(d=>allShared.push({...d,ownerName:u.name,ownerRoom:`${u.floor} ${u.room}`}));
+    drugs.filter(d=>d.share).forEach(d=>allShared.push({...d,ownerId:uid,ownerName:u.name,ownerRoom:`${u.floor} ${u.room}`,ownerFloor:u.floor}));
   }
   if(allShared.length===0){container.innerHTML=`<div style="color:var(--gray);font-size:13px">아직 공유된 약이 없어요</div>`;return;}
-  container.innerHTML=allShared.slice(0,6).map(d=>`
+  const sameFloor=allShared.filter(d=>d.ownerFloor===currentUser.floor);
+  const others=allShared.filter(d=>d.ownerFloor!==currentUser.floor);
+  const sorted=[...sameFloor,...others].slice(0,6);
+  container.innerHTML=sorted.map(d=>`
     <div class="friend-drug-card">
-      <div class="friend-info"><div class="friend-avatar">${d.ownerName[0]}</div><div><div class="friend-name-text">${d.ownerName}</div><div class="friend-room-text">${d.ownerRoom}</div></div></div>
+      <div class="friend-info"><div class="friend-avatar">${d.ownerName[0]}</div><div><div class="friend-name-text">${d.ownerName}${d.ownerFloor===currentUser.floor?` <span style="font-size:10px;background:rgba(16,185,129,0.15);color:var(--safe);padding:2px 6px;border-radius:6px">같은 층</span>`:''}</div><div class="friend-room-text">${d.ownerRoom}</div></div></div>
       <div class="friend-drug-name">${d.name}</div>
       <div class="friend-drug-qty">${d.qty||''}</div>
-      <button class="btn btn-mint borrow-btn" onclick="openBorrowModal('${d.ownerName}','${d.ownerRoom}','${d.name}')">빌리러 가기 →</button>
+      <button class="btn btn-mint borrow-btn" onclick="openBorrowModal('${d.ownerId}','${d.ownerName}','${d.ownerRoom}','${d.name}')">빌리러 가기 →</button>
     </div>`).join('');
 }
 
@@ -1029,8 +1239,14 @@ async function loadFriendDrugs(){
     const drugs=await storageGet(key,true)||[];
     const users=await storageGet('users',true)||{};
     const u=users[uid];if(!u)continue;
-    drugs.filter(d=>d.share).forEach(d=>allShared.push({...d,ownerName:u.name,ownerRoom:`${u.floor} ${u.room}`}));
+    drugs.filter(d=>d.share).forEach(d=>allShared.push({...d,ownerId:uid,ownerName:u.name,ownerRoom:`${u.floor} ${u.room}`,ownerFloor:u.floor}));
   }
+  // 같은 층 먼저
+  allShared.sort((a,b)=>{
+    const sa=a.ownerFloor===currentUser.floor?0:1;
+    const sb=b.ownerFloor===currentUser.floor?0:1;
+    return sa-sb;
+  });
   let filtered=allShared;
   if(borrowSearch)filtered=filtered.filter(d=>d.name.includes(borrowSearch));
   if(borrowFilter!=='전체'){
@@ -1040,14 +1256,16 @@ async function loadFriendDrugs(){
   }
   const grid=document.getElementById('friendDrugGrid');
   if(filtered.length===0){grid.innerHTML=`<div class="no-drugs" style="grid-column:1/-1"><div class="no-drugs-icon">🤝</div><div class="no-drugs-text">공유된 약이 없습니다</div></div>`;return;}
-  grid.innerHTML=filtered.map(d=>`
-    <div class="friend-drug-card">
-      <div class="friend-info"><div class="friend-avatar">${d.ownerName[0]}</div><div><div class="friend-name-text">${d.ownerName}</div><div class="friend-room-text">${d.ownerRoom}</div></div></div>
+  grid.innerHTML=filtered.map(d=>{
+    const sameFloor=d.ownerFloor===currentUser.floor;
+    return `<div class="friend-drug-card" style="${sameFloor?'border-color:rgba(16,185,129,0.4)':''}">
+      <div class="friend-info"><div class="friend-avatar">${d.ownerName[0]}</div><div><div class="friend-name-text">${d.ownerName}${sameFloor?` <span style="font-size:10px;background:rgba(16,185,129,0.15);color:var(--safe);padding:2px 6px;border-radius:6px">같은 층</span>`:''}</div><div class="friend-room-text">${d.ownerRoom}</div></div></div>
       <div class="friend-drug-name">${d.name}</div>
       <div class="friend-drug-qty">${d.qty||'수량 미기재'}</div>
       ${d.note?`<div style="font-size:12px;color:var(--gray2);margin-bottom:8px">${d.note}</div>`:''}
-      <button class="btn btn-mint borrow-btn" onclick="openBorrowModal('${d.ownerName}','${d.ownerRoom}','${d.name}')">빌리러 가기 →</button>
-    </div>`).join('');
+      <button class="btn btn-mint borrow-btn" onclick="openBorrowModal('${d.ownerId}','${d.ownerName}','${d.ownerRoom}','${d.name}')">빌리러 가기 →</button>
+    </div>`;
+  }).join('');
 }
 
 function setBorrowFilter(f,el){
@@ -1058,20 +1276,42 @@ function setBorrowFilter(f,el){
 function filterFriendDrugs(v){borrowSearch=v;loadFriendDrugs();}
 
 let borrowTarget=null;
-function openBorrowModal(name,room,drug){
-  borrowTarget={name,room,drug};
+async function openBorrowModal(ownerId,name,room,drug){
+  borrowTarget={ownerId,name,room,drug};
+  // 같은 층 친구 추천
+  const myFloor = currentUser.floor;
+  const ownerFloor = room.split('층')[0] + '층';
+  const sameFloor = myFloor && ownerFloor && myFloor===ownerFloor;
   document.getElementById('borrowModalContent').innerHTML=`
     <div style="font-size:14px;line-height:1.8;color:#CBD5E1">
       <div style="background:rgba(21,101,192,0.08);border:1px solid rgba(21,101,192,0.2);border-radius:12px;padding:16px;margin-bottom:16px">
         <div style="font-size:16px;font-weight:700;margin-bottom:4px">${drug}</div>
         <div style="font-size:13px;color:var(--gray)">👤 ${name} · 📍 ${room}</div>
+        ${sameFloor?`<div style="margin-top:6px;font-size:12px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);color:var(--safe);padding:4px 10px;border-radius:8px;display:inline-block">🏠 같은 층 친구! 바로 옆에 있어요</div>`:''}
       </div>
       <p>직접 해당 호실을 방문해서 정중하게 부탁해보세요!</p>
       <p style="margin-top:8px;color:var(--warn);font-size:13px">⚠️ 빌리기 전에 AI 증상 체크로 해당 약이 안전한지 확인하세요.</p>
+      <p style="margin-top:8px;color:#90CAF9;font-size:12px">📨 빌리기 확인 시 ${name}님에게 알림이 전송돼요.</p>
     </div>`;
   document.getElementById('borrowModal').classList.remove('hidden');
 }
-function confirmBorrow(){showToast(`📍 ${borrowTarget.room} ${borrowTarget.name}님께 방문해보세요!`);closeModal('borrowModal');}
+async function confirmBorrow(){
+  if(borrowTarget && borrowTarget.ownerId){
+    // 알림 전송
+    const notifs = await storageGet(`notifs:${borrowTarget.ownerId}`,true)||[];
+    notifs.push({
+      id:Date.now(),
+      from: currentUser.name,
+      fromRoom: `${currentUser.floor} ${currentUser.room}`,
+      drug: borrowTarget.drug,
+      time: new Date().toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}),
+      read: false
+    });
+    await storageSet(`notifs:${borrowTarget.ownerId}`, notifs, true);
+  }
+  showToast(`📍 ${borrowTarget.room} ${borrowTarget.name}님께 방문해보세요!`);
+  closeModal('borrowModal');
+}
 function closeModal(id){document.getElementById(id).classList.add('hidden');}
 
 async function addRecord(){
@@ -1197,6 +1437,237 @@ async function loadContactList() {
     </div>`).join('');
 }
 
+// ── 테마 토글 ──────────────────────────────────────
+function toggleTheme(){
+  const isLight=document.body.classList.toggle('light-mode');
+  document.getElementById('themeBtn').textContent=isLight?'☀️':'🌙';
+  localStorage.setItem('theme',isLight?'light':'dark');
+}
+function applyTheme(){
+  const t=localStorage.getItem('theme');
+  if(t==='light'){document.body.classList.add('light-mode');document.getElementById('themeBtn').textContent='☀️';}
+}
+
+// ── 알림 확인 ──────────────────────────────────────
+async function checkNotifs(){
+  const notifs=await storageGet(`notifs:${currentUser.id}`,true)||[];
+  const unread=notifs.filter(n=>!n.read).length;
+  const badge=document.getElementById('chatBadge');
+  if(unread>0){badge.textContent=unread;badge.classList.remove('hidden');}
+  else badge.classList.add('hidden');
+}
+
+// ── 사감실 ──────────────────────────────────────
+let dormAdminMode=false;
+function toggleDormAdmin(){
+  dormAdminMode=!dormAdminMode;
+  document.getElementById('dormAdminPanel').classList.toggle('hidden',!dormAdminMode);
+}
+async function loadDormitory(){
+  const data=await storageGet('dormitory',true)||{open:true,drugs:[],updated:'-'};
+  document.getElementById('dormStatusBadge').innerHTML=data.open?'🟢 운영중':'🔴 운영 종료';
+  document.getElementById('dormStatusBadge').style.background=data.open?'rgba(16,185,129,0.1)':'rgba(239,68,68,0.1)';
+  document.getElementById('dormStatusBadge').style.borderColor=data.open?'rgba(16,185,129,0.3)':'rgba(239,68,68,0.3)';
+  document.getElementById('dormStatusBadge').style.color=data.open?'var(--safe)':'var(--danger)';
+  document.getElementById('dormLastUpdate').textContent=data.updated;
+  document.getElementById('dormOpenToggle').checked=data.open;
+  document.getElementById('dormOpenLabel').textContent=data.open?'운영중':'운영 종료';
+  const list=document.getElementById('dormDrugList');
+  if(!data.drugs||data.drugs.length===0){list.innerHTML=`<div style="text-align:center;padding:30px;color:var(--gray);font-size:13px">등록된 비상약이 없어요</div>`;return;}
+  list.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">${data.drugs.map(d=>`
+    <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:14px">
+      <div style="font-size:15px;font-weight:700;margin-bottom:6px">${d.name}</div>
+      <div style="font-size:13px;color:var(--gray);margin-bottom:8px">수량: ${d.qty}</div>
+      <span class="tag ${d.status==='운영중'?'tag-green':d.status==='소진임박'?'tag-yellow':'tag-red'}">${d.status}</span>
+      ${dormAdminMode?`<button class="btn btn-danger" style="padding:4px 8px;font-size:11px;margin-top:8px;width:100%" onclick="deleteDormDrug(${d.id})">삭제</button>`:''}
+    </div>`).join('')}</div>`;
+}
+async function addDormDrug(){
+  const name=document.getElementById('dormDrugName').value.trim();
+  const qty=document.getElementById('dormDrugQty').value.trim();
+  const status=document.getElementById('dormStatus').value;
+  if(!name){showToast('약 이름을 입력하세요');return;}
+  const data=await storageGet('dormitory',true)||{open:true,drugs:[]};
+  data.drugs.push({id:Date.now(),name,qty:qty||'미기재',status});
+  data.updated=new Date().toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+  await storageSet('dormitory',data,true);
+  document.getElementById('dormDrugName').value='';
+  document.getElementById('dormDrugQty').value='';
+  showToast('✅ 추가됐어요!');loadDormitory();
+}
+async function deleteDormDrug(id){
+  const data=await storageGet('dormitory',true)||{open:true,drugs:[]};
+  data.drugs=data.drugs.filter(d=>d.id!==id);
+  data.updated=new Date().toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+  await storageSet('dormitory',data,true);
+  showToast('삭제됐어요');loadDormitory();
+}
+async function setDormOpen(val){
+  const data=await storageGet('dormitory',true)||{open:true,drugs:[]};
+  data.open=val;
+  data.updated=new Date().toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+  await storageSet('dormitory',data,true);
+  document.getElementById('dormOpenLabel').textContent=val?'운영중':'운영 종료';
+  showToast(val?'🟢 운영중으로 변경됐어요':'🔴 운영 종료로 변경됐어요');
+  loadDormitory();
+}
+
+// ── 나의 상태 기록 ──────────────────────────────────────
+async function saveHealthLog(){
+  const symptom=document.getElementById('logSymptom').value.trim();
+  if(!symptom){showToast('증상/상태를 입력해주세요');return;}
+  const severity=document.getElementById('logSeverity').value;
+  const category=document.getElementById('logCategory').value;
+  const memo=document.getElementById('logMemo').value.trim();
+  const logs=await storageGet(`healthlog:${currentUser.id}`)||[];
+  const now=new Date();
+  logs.push({id:Date.now(),symptom,severity:parseInt(severity),category,memo,
+    date:now.toLocaleDateString('ko-KR',{year:'numeric',month:'numeric',day:'numeric'}),
+    time:now.toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})});
+  await storageSet(`healthlog:${currentUser.id}`,logs);
+  document.getElementById('logSymptom').value='';
+  document.getElementById('logMemo').value='';
+  showToast('📊 상태가 기록됐어요!');loadHealthLogs();
+}
+async function loadHealthLogs(){
+  const logs=await storageGet(`healthlog:${currentUser.id}`)||[];
+  const cat=document.getElementById('logFilterCat')?.value||'전체';
+  const filtered=cat==='전체'?logs:logs.filter(l=>l.category===cat);
+  const el=document.getElementById('healthLogList');
+  if(filtered.length===0){el.innerHTML=`<div style="text-align:center;padding:30px;color:var(--gray);font-size:13px">기록이 없어요</div>`;return;}
+  // 통계
+  const sameCat=logs.filter(l=>l.category===cat||cat==='전체');
+  const avgSev=sameCat.length>0?(sameCat.reduce((a,b)=>a+b.severity,0)/sameCat.length).toFixed(1):'0';
+  const statHtml=`<div style="background:rgba(21,101,192,0.08);border:1px solid rgba(21,101,192,0.2);border-radius:12px;padding:14px;margin-bottom:16px;display:flex;gap:20px">
+    <div style="text-align:center"><div style="font-size:22px;font-weight:900;color:#64B5F6">${sameCat.length}</div><div style="font-size:11px;color:var(--gray)">총 기록</div></div>
+    <div style="text-align:center"><div style="font-size:22px;font-weight:900;color:#64B5F6">${avgSev}</div><div style="font-size:11px;color:var(--gray)">평균 심각도</div></div>
+    <div style="text-align:center"><div style="font-size:22px;font-weight:900;color:#64B5F6">${sameCat.filter(l=>l.severity>=4).length}</div><div style="font-size:11px;color:var(--gray)">심한 날</div></div>
+  </div>`;
+  const sevEmoji=['','😊','🙂','😐','😣','😫'];
+  el.innerHTML=statHtml+filtered.slice().reverse().map(l=>`
+    <div class="health-log-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div>
+          <span class="tag tag-blue" style="font-size:11px">${l.category}</span>
+          <span style="font-size:18px;margin-left:8px">${sevEmoji[l.severity]||'😐'}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:var(--gray2)">${l.time}</span>
+          <button class="record-delete" onclick="deleteHealthLog(${l.id})">🗑</button>
+        </div>
+      </div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px">${l.symptom}</div>
+      <div style="font-size:12px;color:var(--gray)">심각도: ${'●'.repeat(l.severity)}${'○'.repeat(5-l.severity)} (${l.severity}/5)</div>
+      ${l.memo?`<div style="font-size:13px;color:var(--gray2);margin-top:6px;line-height:1.5">${l.memo}</div>`:''}
+    </div>`).join('');
+}
+async function deleteHealthLog(id){
+  let logs=await storageGet(`healthlog:${currentUser.id}`)||[];
+  logs=logs.filter(l=>l.id!==id);
+  await storageSet(`healthlog:${currentUser.id}`,logs);
+  showToast('삭제됐어요');loadHealthLogs();
+}
+
+// ── 채팅 ──────────────────────────────────────
+let currentChatWith=null;
+let chatInterval=null;
+async function searchChatUsers(query){
+  const el=document.getElementById('chatUserResults');
+  if(!query){el.innerHTML='';return;}
+  const users=await storageGet('users',true)||{};
+  const results=Object.entries(users).filter(([id,u])=>id!==currentUser.id&&(u.name.includes(query)||u.room.includes(query)));
+  if(results.length===0){el.innerHTML=`<div style="color:var(--gray);font-size:13px;padding:10px">검색 결과가 없어요</div>`;return;}
+  el.innerHTML=results.map(([id,u])=>`
+    <div class="chat-room-item" onclick="openChatRoom('${id}','${u.name}','${u.floor} ${u.room}')">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="friend-avatar">${u.name[0]}</div>
+        <div><div style="font-size:14px;font-weight:600">${u.name}</div><div style="font-size:12px;color:var(--gray)">${u.floor} ${u.room}</div></div>
+      </div>
+      <span style="color:var(--mint);font-size:13px">채팅 →</span>
+    </div>`).join('');
+}
+async function loadChatRooms(){
+  // 알림도 확인
+  await checkNotifs();
+  const notifs=await storageGet(`notifs:${currentUser.id}`,true)||[];
+  const unread=notifs.filter(n=>!n.read);
+  const users=await storageGet('users',true)||{};
+  // 최근 채팅 목록
+  const keys=await storageList(`chat:`,true);
+  const myChats=keys.filter(k=>k.includes(currentUser.id));
+  const el=document.getElementById('chatRoomList');
+  if(myChats.length===0&&unread.length===0){el.innerHTML=`<div style="color:var(--gray);font-size:13px;padding:20px 0">아직 채팅이 없어요. 위에서 친구를 검색해 먼저 대화를 시작해보세요!</div>`;return;}
+  // 약 빌리기 알림도 표시
+  const notifHtml=unread.length>0?`<div style="margin-bottom:12px">${unread.map(n=>`
+    <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:12px;padding:12px 16px;margin-bottom:8px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px">💊 약 빌리기 요청</div>
+      <div style="font-size:12px;color:var(--gray)">${n.from} (${n.fromRoom})님이 <b>${n.drug}</b>를 빌리고 싶어해요</div>
+      <div style="font-size:11px;color:var(--gray2);margin-top:4px">${n.time}</div>
+    </div>`).join('')}</div>`:'';
+  const chatHtml=myChats.map(k=>{
+    const ids=k.replace('chat:','').split('_');
+    const otherId=ids.find(id=>id!==currentUser.id);
+    const u=users[otherId];if(!u)return'';
+    return `<div class="chat-room-item" onclick="openChatRoom('${otherId}','${u.name}','${u.floor} ${u.room}')">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="friend-avatar">${u.name[0]}</div>
+        <div><div style="font-size:14px;font-weight:600">${u.name}</div><div style="font-size:12px;color:var(--gray)">${u.floor} ${u.room}</div></div>
+      </div>
+      <span style="color:var(--mint);font-size:13px">→</span>
+    </div>`;
+  }).join('');
+  el.innerHTML=notifHtml+chatHtml;
+  // 알림 읽음 처리
+  if(unread.length>0){
+    const allNotifs=notifs.map(n=>({...n,read:true}));
+    await storageSet(`notifs:${currentUser.id}`,allNotifs,true);
+    document.getElementById('chatBadge').classList.add('hidden');
+  }
+}
+function getChatKey(uid1,uid2){
+  return 'chat:'+[uid1,uid2].sort().join('_');
+}
+async function openChatRoom(otherId,name,room){
+  currentChatWith={id:otherId,name,room};
+  document.getElementById('chatRoomView').classList.add('hidden');
+  document.getElementById('chatMessageView').classList.remove('hidden');
+  document.getElementById('chatRoomTitle').textContent=`${name} · ${room}`;
+  await renderChatMessages();
+  if(chatInterval)clearInterval(chatInterval);
+  chatInterval=setInterval(renderChatMessages,3000);
+}
+function closeChatRoom(){
+  if(chatInterval)clearInterval(chatInterval);
+  currentChatWith=null;
+  document.getElementById('chatMessageView').classList.add('hidden');
+  document.getElementById('chatRoomView').classList.remove('hidden');
+  loadChatRooms();
+}
+async function renderChatMessages(){
+  if(!currentChatWith)return;
+  const key=getChatKey(currentUser.id,currentChatWith.id);
+  const msgs=await storageGet(key,true)||[];
+  const el=document.getElementById('chatMessages');
+  el.innerHTML=msgs.map(m=>`
+    <div class="chat-msg ${m.from===currentUser.id?'mine':''}">
+      ${m.from!==currentUser.id?`<div class="friend-avatar" style="width:28px;height:28px;font-size:11px;flex-shrink:0">${currentChatWith.name[0]}</div>`:''}
+      <div>
+        <div class="chat-bubble">${m.text}</div>
+        <div style="font-size:10px;color:var(--gray2);margin-top:2px;${m.from===currentUser.id?'text-align:right':''}">${m.time}</div>
+      </div>
+    </div>`).join('');
+  el.scrollTop=el.scrollHeight;
+}
+async function sendChatMsg(){
+  const inp=document.getElementById('chatInput');
+  const text=inp.value.trim();if(!text||!currentChatWith)return;
+  const key=getChatKey(currentUser.id,currentChatWith.id);
+  const msgs=await storageGet(key,true)||[];
+  msgs.push({from:currentUser.id,text,time:new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})});
+  await storageSet(key,msgs,true);
+  inp.value='';
+  await renderChatMessages();
+}
 function showToast(msg){
   const t=document.getElementById('toast');
   t.textContent=msg;t.classList.add('show');
