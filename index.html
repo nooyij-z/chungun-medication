@@ -1136,13 +1136,18 @@ async function runAICheck(){
 
 한국어로, 이모지 활용해 읽기 쉽게 작성해주세요.`;
   try {
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1200,messages:[{role:'user',content:prompt}]})
+    const res=await fetch('https://chungun-api.vercel.app/api/claude',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({prompt})
     });
     clearInterval(tmiInterval);
+    if(!res.ok){
+      const err=await res.json().catch(()=>({}));
+      throw new Error(err.error?.message||'API 오류');
+    }
     const data=await res.json();
-    const fullText=data.content.map(c=>c.text||'').join('');
+    const fullText=data.text||'';
     // 같이 먹으면 안 되는 약 섹션 분리
     const dangerMatch=fullText.match(/4\.\s*🚫[^\n]*\n([\s\S]*?)(?=5\.|$)/);
     if(dangerMatch&&dangerMatch[1].trim()&&!dangerMatch[1].includes('특별한 금기 조합 없음')){
@@ -1153,6 +1158,7 @@ async function runAICheck(){
     loadMatchedFriendDrugs();
   } catch(e) {
     clearInterval(tmiInterval);
+    console.error('AI 오류:', e);
     content.textContent='⚠️ AI 연결에 실패했습니다. 잠시 후 다시 시도해주세요.\n\n일반 안내:\n• 두통/생리통: 타이레놀 권장\n• 복통/소화불량: 훼스탈, 베아제\n• 감기몸살: 충분한 수분과 휴식\n• 증상이 심하면 사감실에 도움 요청하세요.';
   }
 }
